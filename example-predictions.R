@@ -53,6 +53,7 @@ train_x <- train_x %>% select(-winner)
 # Convert to Matrix for XGBoost
 m_train_x <- model.matrix(~ . - 1, data = train_x)  # Remove intercept term
 
+set.seed(123)
 # --- Train XGBoost Model ---
 bst <- xgboost(
   data = m_train_x,
@@ -88,3 +89,11 @@ check <- data.frame(
 
 # --- View Results ---
 check
+
+# An example of what's expected in your .csv submission.
+# Your code should reproduce your predictions EXACTLY
+
+example_submission = check %>%
+  select(Name, Probabilities)
+
+
