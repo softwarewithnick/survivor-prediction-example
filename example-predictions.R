@@ -16,24 +16,41 @@ chal <- survivoR::challenge_results
 cast_scores <- survivoR::castaway_scores
 vh <- survivoR::vote_history
 
+# -- Current Season Final 5 Contestants -- #
+
+# STEVEN'S DATA IS NOT UPDATED YET, HE WAS VOTED OUT ON DEC 10th
+# I WILL REMOVE HIM FROM THE DATA FOR THIS EXAMPLE
+
+current_finalists = cast %>%
+  filter(season == 49,
+         castaway != "Steven",
+         is.na(episode))
+
+finalist_ids = current_finalists$castaway_id
+
+current_scores = cast_scores %>%
+  filter(castaway_id %in% finalist_ids)
+
+
+
 # --- Identify Winners for Each Season ---
 winners <- cast %>%
   select(season, castaway, winner) %>%
   na.omit()
 
-# --- Select Top 4 Contestants Per Season by Outlast Score ---
-top4_outlast <- cast_scores %>%
+# --- Select Top 5 Contestants Per Season by Outlast Score ---
+top5_outlast <- cast_scores %>%
   group_by(season) %>%
   arrange(desc(score_outlast)) %>%
-  slice_head(n = 4) %>%
+  slice_head(n = 5) %>%
   select(
     season, castaway, castaway_id, score_outlast,
     n_idols_found, n_adv_found, n_tribals, n_votes_received
   ) %>%
   ungroup()
 
-# --- Merge Top 4 Data with Winners ---
-top_win_merge <- top4_outlast %>%
+# --- Merge Top 5 Data with Winners ---
+top_win_merge <- top5_outlast %>%
   left_join(winners, join_by(season == season, castaway == castaway)) %>%
   mutate(
     n_idols_found = replace_na(n_idols_found, 0),
@@ -42,9 +59,9 @@ top_win_merge <- top4_outlast %>%
     winner = as.numeric(winner)
   )
 
-# --- Prepare Training Data (All Seasons Except 48) ---
+# --- Prepare Training Data (All Seasons Except Current [49]) ---
 train_x <- top_win_merge %>%
-  filter(season != 48) %>%
+  filter(season != 49) %>%
   select(n_idols_found, n_adv_found, n_tribals, n_votes_received, winner)
 
 train_y <- train_x$winner
@@ -52,6 +69,7 @@ train_x <- train_x %>% select(-winner)
 
 # Convert to Matrix for XGBoost
 m_train_x <- model.matrix(~ . - 1, data = train_x)  # Remove intercept term
+m_train_x = as.matrix(train_x)
 
 set.seed(123)
 # --- Train XGBoost Model ---
@@ -64,27 +82,27 @@ bst <- xgboost(
   verbose = 0
 )
 
-# --- Prepare Test Data (Season 48) ---
-test_x <- top_win_merge %>%
-  filter(season == 48) %>%
-  select(n_idols_found, n_adv_found, n_tribals, n_votes_received, winner, castaway)
+# --- Prepare Current Season ---
+current_season_data = current_scores %>%
+  select(n_idols_found, n_adv_found, n_tribals, n_votes_received, castaway)
 
-test_castaway <- test_x$castaway
-test_y <- test_x$winner
-test_x <- test_x %>% select(-winner, -castaway)
+  
+
+current_castaways <- current_season_data$castaway
+current_season_data <- current_season_data %>% select(-castaway)
 
 # Convert to Matrix for Prediction
 m_test_x <- model.matrix(~ . - 1, data = test_x)
+m_test_x = as.matrix(current_season_data)
 
 # --- Generate Predictions ---
 preds <- predict(bst, m_test_x)
 
 # --- Combine Predictions with Castaway Info ---
 check <- data.frame(
-  Name = test_castaway,
+  Name = current_castaways,
   Predictions = preds,
-  Probabilities = preds / sum(preds),
-  Actual = test_y
+  Probabilities = preds / sum(preds)
 )
 
 # --- View Results ---
@@ -96,4 +114,5 @@ check
 example_submission = check %>%
   select(Name, Probabilities)
 
+write.csv(example_submission, "example_submission.csv", row.names = FALSE)
 
