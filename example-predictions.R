@@ -68,7 +68,6 @@ train_y <- train_x$winner
 train_x <- train_x %>% select(-winner)
 
 # Convert to Matrix for XGBoost
-m_train_x <- model.matrix(~ . - 1, data = train_x)  # Remove intercept term
 m_train_x = as.matrix(train_x)
 
 set.seed(123)
@@ -92,11 +91,10 @@ current_castaways <- current_season_data$castaway
 current_season_data <- current_season_data %>% select(-castaway)
 
 # Convert to Matrix for Prediction
-m_test_x <- model.matrix(~ . - 1, data = test_x)
-m_test_x = as.matrix(current_season_data)
+m_data = as.matrix(current_season_data)
 
 # --- Generate Predictions ---
-preds <- predict(bst, m_test_x)
+preds <- predict(bst, m_data)
 
 # --- Combine Predictions with Castaway Info ---
 check <- data.frame(
